@@ -5,7 +5,8 @@ import io # Required for reading string data as file
 import google.generativeai as genai
 import yaml
 from datetime import datetime, timedelta
-# from config import GOOGLE_API_KEY # <<< REMOVED IMPORT
+# OR-Tools import removed
+from config import GOOGLE_API_KEY
 import re
 import json
 import sys # Required for checking xlsxwriter
@@ -21,144 +22,106 @@ try:
 except ImportError:
     st.warning("Module 'xlsxwriter' is recommended for Excel export. Install using: pip install xlsxwriter")
 
-# --- UPDATED: Check and configure Google API Key using Streamlit Secrets ---
+# Check and configure Google API Key
 GOOGLE_API_KEY = st.secrets.get("GOOGLE_API_KEY")
-
 if not GOOGLE_API_KEY:
     st.error("Lỗi: Google API Key chưa được cấu hình trong Streamlit Secrets!")
     st.info("Vui lòng thêm GOOGLE_API_KEY vào mục Secrets trong cài đặt ứng dụng của bạn trên Streamlit Community Cloud.")
-    st.stop() # Stop execution if no API key
+    st.stop()
 
 # Configure Google Generative AI
 try:
     genai.configure(api_key=GOOGLE_API_KEY)
 except Exception as e:
-     st.error(f"Lỗi cấu hình Google API: {e}")
-     st.stop()
+     st.error(f"Lỗi cấu hình Google API: {e}"); st.stop()
 
 # Generation config for Google Generative AI
-generation_config = {
-    "temperature": 0.7,
-    "top_p": 1,
-    "top_k": 1,
-    "max_output_tokens": 4096
-}
+generation_config = { "temperature": 0.7, "top_p": 1, "top_k": 1, "max_output_tokens": 4096 }
 
 # Initialize the Generative Model
 try:
-    model = genai.GenerativeModel(
-        model_name="gemini-1.5-pro",
-        generation_config=generation_config
-    )
+    model = genai.GenerativeModel(model_name="gemini-1.5-pro", generation_config=generation_config)
 except Exception as e:
-    st.error(f"Lỗi khởi tạo mô hình AI: {e}")
-    st.error("Vui lòng kiểm tra API Key và kết nối mạng.")
-    st.stop()
+    st.error(f"Lỗi khởi tạo mô hình AI: {e}"); st.error("Kiểm tra API Key và kết nối mạng."); st.stop()
 
+# --- Define Predefined Column Names ---
+PREDEFINED_COLUMNS = [
+    "Tên nhân viên:",
+    "Đăng kí ca cho tuần:",
+    "bạn có thể làm việc thời gian nào? [Thứ 2]",
+    "bạn có thể làm việc thời gian nào? [Thứ 3]",
+    "bạn có thể làm việc thời gian nào? [Thứ 4]",
+    "bạn có thể làm việc thời gian nào? [Thứ 5]",
+    "bạn có thể làm việc thời gian nào? [Thứ 6]",
+    "bạn có thể làm việc thời gian nào? [Thứ 7]",
+    "bạn có thể làm việc thời gian nào? [Chủ nhật]",
+    "Ghi chú (nếu có)"
+]
 
 # --- Custom CSS for Styling (Keep as is) ---
 def load_css():
     """Loads custom CSS styles."""
-    # CSS content kept the same as previous version
     st.markdown("""
         <style>
-            /* General Body and Font */
             body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-            /* Main Container */
-            .main .block-container { padding-top: 2rem; padding-bottom: 5rem; padding-left: 2rem; padding-right: 2rem; } /* Reduced padding */
-            /* Titles */
+            .main .block-container { padding-top: 2rem; padding-bottom: 5rem; padding-left: 2rem; padding-right: 2rem; }
             h1, h2 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 5px; margin-bottom: 20px;}
             h3 { color: #34495e; margin-top: 25px; margin-bottom: 15px; }
             body:has([data-theme="dark"]) h1, body:has([data-theme="dark"]) h2, body:has([data-theme="dark"]) h3 { color: #ecf0f1; border-bottom-color: #5dade2;}
             body:has([data-theme="dark"]) h3 { color: #bdc3c7;}
-
-            /* Buttons */
-            .stButton>button { border-radius: 8px; padding: 10px 15px; font-weight: 600; border: none; color: white; background-color: #3498db; transition: background-color 0.3s ease; margin-top: 5px; margin-bottom: 5px;} /* Slightly less padding */
+            .stButton>button { border-radius: 8px; padding: 10px 15px; font-weight: 600; border: none; color: white; background-color: #3498db; transition: background-color 0.3s ease; margin-top: 5px; margin-bottom: 5px;}
             .stButton>button:hover { background-color: #2980b9; }
             .stButton>button:active { background-color: #2471a3; }
             .stButton[key*="generate_ai_button"]>button { background-color: #2ecc71; }
             .stButton[key*="generate_ai_button"]>button:hover { background-color: #27ae60; }
-            /* Button for copy text */
-             .stButton[key*="generate_copy_text_button"]>button { background-color: #9b59b6; /* Purple */ }
-             .stButton[key*="generate_copy_text_button"]>button:hover { background-color: #8e44ad; /* Darker Purple */ }
-
-
-            /* Text Area */
-            .stTextArea textarea { border-radius: 8px; border: 1px solid #bdc3c7; padding: 10px; min-height: 150px; font-family: monospace; /* Use monospace for better alignment */}
+            .stButton[key*="generate_copy_text_button"]>button { background-color: #9b59b6; }
+            .stButton[key*="generate_copy_text_button"]>button:hover { background-color: #8e44ad; }
+            .stTextArea textarea { border-radius: 8px; border: 1px solid #bdc3c7; padding: 10px; min-height: 150px; font-family: monospace; }
             body:has([data-theme="dark"]) .stTextArea textarea { border: 1px solid #566573; }
             .stTextArea label { font-weight: 600; color: #34495e; margin-bottom: 5px; display: block;}
             body:has([data-theme="dark"]) .stTextArea label { color: #bdc3c7; }
-
-            /* DataFrames / Data Editor / Manual Table */
-            .stDataFrame, .stDataEditor, .manual-table-header, .manual-table-row { border-radius: 8px; overflow: visible; margin-bottom: 10px;} /* Reduced margin */
-            .manual-table-header > div { font-weight: bold; background-color: #eaf2f8; padding: 8px 6px; text-align: center; border: 1px solid #d6eaf8; font-size: 0.9rem;} /* Smaller padding/font */
+            .stDataFrame, .stDataEditor, .manual-table-header, .manual-table-row { border-radius: 8px; overflow: visible; margin-bottom: 10px;}
+            .manual-table-header > div { font-weight: bold; background-color: #eaf2f8; padding: 8px 6px; text-align: center; border: 1px solid #d6eaf8; font-size: 0.9rem;}
             body:has([data-theme="dark"]) .manual-table-header > div { background-color: #34495e; border: 1px solid #4e6070; }
-            .manual-table-row > div { padding: 4px 6px; border: 1px solid #e8ecf1; min-height: 55px; display: flex; align-items: center; justify-content: center;} /* Reduced padding */
+            .manual-table-row > div { padding: 4px 6px; border: 1px solid #e8ecf1; min-height: 55px; display: flex; align-items: center; justify-content: center;}
             body:has([data-theme="dark"]) .manual-table-row > div { border: 1px solid #4a4f5a; }
-            /* Alternating row colors for manual table */
             .manual-table-row:nth-child(even) > div { background-color: #f8f9fa; }
             body:has([data-theme="dark"]) .manual-table-row:nth-child(even) > div { background-color: #2c3e50; }
-
-
-            /* Selectbox in manual table */
             .manual-table-row .stSelectbox { width: 100%; overflow: visible !important; }
             .manual-table-row .stSelectbox div[data-baseweb="select"] { font-size: 0.85rem; width: 100%; background-color: var(--background-color); }
             .manual-table-row .stSelectbox div[data-baseweb="select"] > div:first-child { color: var(--text-color) !important; overflow: visible !important; }
             .manual-table-row .stSelectbox div[data-baseweb="select"] > div:first-child > div { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; max-width: none !important; }
-
-
-            /* Sidebar */
-             .stSidebar .stNumberInput input, .stSidebar .stSlider, .stSidebar .stCheckbox { margin-bottom: 10px; }
-             .stSidebar h3 { color: #3498db; margin-top: 15px;}
-             body:has([data-theme="dark"]) .stSidebar h3 { color: #5dade2; }
-             .stSidebar .stMarkdown p { font-size: 0.95rem; line-height: 1.4;}
-             .stSidebar .stDivider { margin-top: 15px; margin-bottom: 15px;}
-
-            /* Footer */
+            .stSidebar .stNumberInput input, .stSidebar .stSlider, .stSidebar .stCheckbox { margin-bottom: 10px; }
+            .stSidebar h3 { color: #3498db; margin-top: 15px;}
+            body:has([data-theme="dark"]) .stSidebar h3 { color: #5dade2; }
+            .stSidebar .stMarkdown p { font-size: 0.95rem; line-height: 1.4;}
+            .stSidebar .stDivider { margin-top: 15px; margin-bottom: 15px;}
             .footer { position: fixed; right: 15px; bottom: 10px; background-color: rgba(44, 62, 80, 0.9); color: #ecf0f1; padding: 8px 15px; border-radius: 8px; font-size: 13px; box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.2); z-index: 9999; }
             body:has([data-theme="dark"]) .footer { background-color: rgba(52, 73, 94, 0.9); color: #bdc3c7; }
-            /* Login Box Specific Styles */
             .login-box { margin: 50px auto 0 auto; max-width: 380px; background-color: rgba(255, 255, 255, 0.9); backdrop-filter: blur(5px); padding: 35px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.15); text-align: center; }
             .login-title { font-size: 24px; font-weight: 600; color: #31333F; margin-bottom: 25px; border-bottom: none; }
             .login-box .stTextInput>div>div>input { padding: 12px; border: 1px solid #ccc; border-radius: 5px; width: 100%; margin-bottom: 15px;}
             .login-box .stButton>button { width: 100%; height: 48px; background-color: #31333F; color: #FFFFFF; border: none; border-radius: 5px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 15px; }
             .login-box .stButton>button:hover { background-color: #50525C; }
             .login-page-background { background: linear-gradient(to right, #74ebd5, #ACB6E5); min-height: 100vh; width: 100%; display: flex; align-items: center; justify-content: center; position: absolute; top: 0; left: 0; z-index: -1; }
-
-            /* Container styling */
             div[data-testid="stVerticalBlock"]:has(> div > div > div.stContainer) { }
              body:has([data-theme="dark"]) div[data-testid="stVerticalBlock"]:has(> div > div > div.stContainer) { }
-
         </style>
     """, unsafe_allow_html=True)
 
 
 # --- Credential Loading and Login Logic ---
 def load_credentials():
-    """Loads credentials from credentials.yaml."""
-    try:
-        # --- UPDATED: Load credentials using st.secrets for deployment security ---
-        # Assuming credentials are also stored in secrets like:
-        # [credentials]
-        # admin = "Rita.lqp.python2301"
-        # csteam = "Hello.parsley2025"
-        credentials_dict = st.secrets.get("credentials", {})
-        if not credentials_dict:
-             st.warning("Không tìm thấy thông tin credentials trong Streamlit Secrets. Sử dụng file credentials.yaml (nếu có).")
-             # Fallback to file if secrets not found (for local testing)
-             try:
-                 with open('credentials.yaml') as file:
-                     credentials_dict = yaml.safe_load(file) or {}
-             except FileNotFoundError:
-                 st.error("File credentials.yaml không tồn tại và không có secrets. Không thể đăng nhập.")
-                 return {}
-             except yaml.YAMLError as e:
-                 st.error(f"Lỗi đọc credentials.yaml: {e}"); return {}
-        return credentials_dict
-    except Exception as e:
-        st.error(f"Lỗi không xác định khi tải credentials: {e}")
-        return {}
-
+    """Loads credentials from Streamlit secrets or local file."""
+    credentials_dict = st.secrets.get("credentials", {})
+    if not credentials_dict:
+         st.warning("Không tìm thấy credentials trong Secrets. Thử đọc file credentials.yaml...")
+         try:
+             with open('credentials.yaml') as file:
+                 credentials_dict = yaml.safe_load(file) or {}
+         except FileNotFoundError: st.error("File credentials.yaml không tồn tại."); return {}
+         except yaml.YAMLError as e: st.error(f"Lỗi đọc credentials.yaml: {e}"); return {}
+    return credentials_dict
 
 def login():
     """Handles the login interface and logic."""
@@ -174,7 +137,6 @@ def login():
         username = st.text_input("Tên đăng nhập", key="login_user").strip()
         password = st.text_input("Mật khẩu", type="password", key="login_pass")
         if st.button("Đăng nhập", key="login_button_main", use_container_width=True):
-            # --- Check against loaded credentials (from secrets or file) ---
             if username in credentials and credentials[username] == password:
                 st.session_state.logged_in = True; st.success("Đăng nhập thành công!"); st.rerun()
             else: st.error("Tên đăng nhập hoặc mật khẩu không đúng.")
@@ -241,9 +203,11 @@ def preprocess_pasted_data_for_lookup(df_input):
     found_day_cols = False
     for day_index, keywords in day_keywords_map.items():
         for col in df_input.columns:
-            if any(keyword in str(col).lower() for keyword in keywords):
-                day_mapping[day_index] = col; found_day_cols = True; break
-    if not found_day_cols: st.error("❌ Không tìm thấy các cột ngày (Thứ 2 - CN)."); return None
+            # --- More specific check for day columns ---
+            col_lower = str(col).lower()
+            if any(f'[{keyword}]' in col_lower for keyword in keywords) or any(f' {keyword}' in col_lower for keyword in keywords):
+                 day_mapping[day_index] = col; found_day_cols = True; break
+    if not found_day_cols: st.error("❌ Không tìm thấy các cột ngày (VD: '... [Thứ 2]')."); return None
     if not employee_col: st.error("❌ Không tìm thấy cột tên nhân viên."); return None
 
     for index, row in df_input.iterrows():
@@ -257,7 +221,9 @@ def preprocess_pasted_data_for_lookup(df_input):
             else:
                 if 'ca 1' in availability_text or 'sáng' in availability_text or '9h' in availability_text: can_do_ca1 = True
                 if 'ca 2' in availability_text or 'chiều' in availability_text or '14h' in availability_text: can_do_ca2 = True
-                if not can_do_ca1 and not can_do_ca2 and availability_text.strip() != '': can_do_ca1 = True; can_do_ca2 = True
+                # If text exists but doesn't specify shift, assume both possible unless explicitly 'nghi'
+                if not can_do_ca1 and not can_do_ca2 and availability_text.strip() != '':
+                     can_do_ca1 = True; can_do_ca2 = True
             processed_rows.append({'Date': current_date.date(), 'Employee': employee.strip(), 'Shift': 'Ca 1', 'Can_Work': can_do_ca1, 'Note': note})
             processed_rows.append({'Date': current_date.date(), 'Employee': employee.strip(), 'Shift': 'Ca 2', 'Can_Work': can_do_ca2, 'Note': note})
     if not processed_rows: st.warning("⚠️ Không có dữ liệu đăng ký hợp lệ."); return pd.DataFrame(columns=['Date', 'Employee', 'Shift', 'Can_Work', 'Note'])
@@ -266,10 +232,9 @@ def preprocess_pasted_data_for_lookup(df_input):
     st.success("✅ Đã xử lý xong dữ liệu đăng ký gốc."); return lookup_df
 
 
-# --- AI Schedule Generation Function (Keep dynamic staffing logic and 4 shifts/week rule) ---
+# --- AI Schedule Generation Function (UPDATED PROMPT for refined note handling) ---
 def generate_schedule_with_ai(df_input, requirements, model):
     """Constructs a prompt and calls the AI model to generate the schedule."""
-    # This function remains the same as the previous version (v9)
     st.info(" Chuẩn bị dữ liệu và tạo prompt cho AI...")
     data_prompt_list = []; data_prompt_list.append("Dữ liệu đăng ký của nhân viên:")
     employee_col = next((col for col in df_input.columns if 'tên' in col.lower()), None)
@@ -314,10 +279,14 @@ def generate_schedule_with_ai(df_input, requirements, model):
     req_prompt_list.append(f"- Ít nhất {requirements['min_rest_hours']} giờ nghỉ giữa các ca (nếu có thể >1 ca/ngày).")
     req_prompt_list.append(f"- Tối đa {requirements['max_consecutive_days']} ngày làm việc liên tiếp.")
     req_prompt_list.append(daily_staffing_prompt) # Add dynamic daily staffing
+    # --- UPDATED: Refined note handling instructions ---
     req_prompt_list.append(f"- Xử lý 'Ghi chú' của nhân viên:")
-    req_prompt_list.append(f"  + Ghi chú 'nghỉ', 'bận', 'không thể', 'xin off': TUYỆT ĐỐI KHÔNG xếp lịch.")
-    req_prompt_list.append(f"  + Ghi chú 'muốn làm', 'ưu tiên', 'có thể làm': CỐ GẮNG xếp nếu không vi phạm ràng buộc (ưu tiên: {requirements['preferences_weight_hint']}).")
-    req_prompt_list.append(f"  + Ghi chú giờ cụ thể (VD: '16h-20h'): Cố gắng xếp vào ca chứa giờ đó (VD: Ca 2).")
+    req_prompt_list.append(f"  + **Ưu tiên 1 (Bắt buộc):** Ghi chú 'nghỉ', 'bận', 'không thể', 'xin off' -> TUYỆT ĐỐI KHÔNG xếp lịch.")
+    req_prompt_list.append(f"  + **Ưu tiên 2 (Mong muốn):** Ghi chú 'muốn làm', 'ưu tiên', 'có thể làm' -> CỐ GẮNG xếp nếu không vi phạm ràng buộc khác (mức độ ưu tiên gợi ý: {requirements['preferences_weight_hint']}).")
+    req_prompt_list.append(f"  + **Ưu tiên 3 (Giờ làm không trọn vẹn):** Nếu ghi chú có giờ cụ thể (VD: 'chỉ làm 9h-12h', 'làm từ 16h'), hãy làm theo các bước sau:")
+    req_prompt_list.append(f"      1. Ưu tiên xếp đủ số người có thể làm **trọn vẹn** ca đó trước.")
+    req_prompt_list.append(f"      2. **CHỈ KHI** ca đó vẫn còn thiếu người theo yêu cầu số lượng, thì MỚI xem xét xếp nhân viên có giờ làm không trọn vẹn vào để đáp ứng nguyện vọng của họ (dù họ không làm đủ giờ).")
+    req_prompt_list.append(f"      3. Nếu ca đã đủ người làm trọn vẹn, thì KHÔNG xếp thêm người chỉ làm được một phần giờ.")
     req_prompt_list.append("- Chỉ xếp lịch vào ca nhân viên đăng ký/có thể làm.")
     req_prompt_list.append("- Bỏ qua nhân viên 'FM/Sup'.")
     req_prompt = "\n".join(req_prompt_list)
@@ -343,7 +312,7 @@ Ví dụ định dạng bảng MARKDOWN mong muốn (với ngày bắt đầu l�
 | 2025-05-06 | Ca 1  | NV E, NV F               | <--- 2 người vì là ngày thường
 | ... (cho đến 2025-05-11) ... | ...   | ...                      |
 
-**QUAN TRỌNG:** Chỉ trả về BẢNG MARKDOWN lịch làm việc, không thêm bất kỳ lời giải thích hay bình luận nào khác trước hoặc sau bảng. Đảm bảo cột "Ngày" chứa ngày<y_bin_46>-MM-DD chính xác cho cả tuần. **Đảm bảo xử lý các 'Ghi chú' theo hướng dẫn đã nêu.** Đảm bảo mọi ràng buộc khác được đáp ứng (đặc biệt là **số người/ca theo từng ngày**, **ĐÚNG {requirements['shifts_per_week_target']} ca/người/tuần**, và {requirements['max_shifts_per_day']} ca/người/ngày). Nếu không thể tạo lịch đáp ứng tất cả ràng buộc (ví dụ: thiếu người cho một ca nào đó, hoặc không thể đảm bảo 4 ca/tuần cho mọi người), hãy ghi rõ điều đó trong bảng hoặc nêu lý do ngắn gọn ngay dưới bảng.
+**QUAN TRỌNG:** Chỉ trả về BẢNG MARKDOWN lịch làm việc, không thêm bất kỳ lời giải thích hay bình luận nào khác trước hoặc sau bảng. Đảm bảo cột "Ngày" chứa ngày<y_bin_46>-MM-DD chính xác cho cả tuần. **Đảm bảo xử lý các 'Ghi chú' theo hướng dẫn đã nêu, đặc biệt là logic ưu tiên cho giờ làm không trọn vẹn.** Đảm bảo mọi ràng buộc khác được đáp ứng (đặc biệt là **số người/ca theo từng ngày**, **ĐÚNG {requirements['shifts_per_week_target']} ca/người/tuần**, và {requirements['max_shifts_per_day']} ca/người/ngày). Nếu không thể tạo lịch đáp ứng tất cả ràng buộc (ví dụ: thiếu người cho một ca nào đó, hoặc không thể đảm bảo 4 ca/tuần cho mọi người), hãy ghi rõ điều đó trong bảng hoặc nêu lý do ngắn gọn ngay dưới bảng.
 """
     with st.expander("Xem Prompt gửi đến AI (để tham khảo)"): st.text(full_prompt)
     try: # Call AI Model
@@ -394,7 +363,7 @@ def parse_ai_schedule(ai_response_text):
     except Exception as e: st.error(f"Lỗi nghiêm trọng khi phân tích bảng Markdown: {e}"); return None
 
 
-# --- Function to Display Formatted Schedule (UPDATED with Selectbox) ---
+# --- Function to Display Formatted Schedule (Keep using Selectbox) ---
 def display_editable_schedule_with_dropdowns(parsed_schedule_df, availability_df):
     """Displays the schedule using columns and selectboxes for editing."""
     st.subheader("📅 Lịch Làm Việc Tuần (Chỉnh sửa / Thay thế)")
@@ -530,7 +499,20 @@ def main_app():
         st.session_state.copyable_text = None # Reset copyable text
         if pasted_data:
             try:
-                data_io = io.StringIO(pasted_data); temp_df = pd.read_csv(data_io, sep='\t', header=0, skipinitialspace=True)
+                # --- UPDATED: Flexible Header Reading ---
+                data_io = io.StringIO(pasted_data)
+                first_line = data_io.readline().lower() # Read first line for header check
+                data_io.seek(0) # Reset pointer to read the whole data again
+                header_keywords = ["tên", "thứ", "ghi chú", "tuần", "ngày"] # Keywords to detect header
+                if any(keyword in first_line for keyword in header_keywords):
+                    # Looks like a header, read normally
+                    temp_df = pd.read_csv(data_io, sep='\t', header=0, skipinitialspace=True)
+                    st.info("Đã đọc dữ liệu với tiêu đề từ người dùng.")
+                else:
+                    # Does not look like a header, use predefined names
+                    temp_df = pd.read_csv(data_io, sep='\t', header=None, names=PREDEFINED_COLUMNS, skipinitialspace=True)
+                    st.info("Không phát hiện tiêu đề, đã sử dụng tên cột mặc định.")
+
                 temp_df.dropna(axis=0, how='all', inplace=True); temp_df.dropna(axis=1, how='all', inplace=True)
                 if not temp_df.empty:
                     st.session_state.df_from_paste = temp_df; st.success("✅ Đã xử lý dữ liệu dán thành công.")
@@ -624,7 +606,7 @@ def main_app():
             col_dl2.warning("Không có dữ liệu lịch đã sửa để tải.")
 
 
-    st.markdown('<div class="footer">Built by <strong>Le Quy Phat</strong> © 2025 (AI Schedule + In-Table Dropdown v15 - Compact & Copy)</div>', unsafe_allow_html=True) # Footer
+    st.markdown('<div class="footer">Built by <strong>Le Quy Phat</strong> © 2025 (AI Schedule + Flexible Header + Refined Notes v16)</div>', unsafe_allow_html=True) # Footer
 
 # --- Entry Point ---
 def main():
