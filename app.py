@@ -497,6 +497,44 @@ def display_editable_schedule_with_dropdowns(parsed_schedule_df, availability_df
         return None # Return None on error
 
 
+# --- Function to Create 8-Column DataFrame (Helper Function) ---
+# --- ADDED BACK: This function is needed if display_editable_schedule_with_dropdowns fails or for initial state ---
+def create_8_column_df(df_schedule):
+    """Creates the 8-column display DataFrame from the parsed 3-column schedule."""
+    if df_schedule is None or df_schedule.empty: return None
+    try:
+        # Ensure 'Ngày' is datetime
+        if 'Ngày' in df_schedule.columns and not pd.api.types.is_datetime64_any_dtype(df_schedule['Ngày']):
+             df_schedule['Ngày'] = pd.to_datetime(df_schedule['Ngày'], errors='coerce')
+        df_schedule = df_schedule.dropna(subset=['Ngày', 'Ca', 'Nhân viên được phân công'])
+        if df_schedule.empty: return None
+        unique_dates = sorted(df_schedule['Ngày'].dt.date.unique())
+        if not unique_dates: return None
+
+        output_rows = []
+        vietnamese_days = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ Nhật"]
+        for current_date in unique_dates:
+            day_name = vietnamese_days[current_date.weekday()]
+            date_str = current_date.strftime('%d/%m/%Y')
+            staff_ca1_str = df_schedule[(df_schedule['Ngày'].dt.date == current_date) & (df_schedule['Ca'] == 'Ca 1')]['Nhân viên được phân công'].iloc[0] if not df_schedule[(df_schedule['Ngày'].dt.date == current_date) & (df_schedule['Ca'] == 'Ca 1')].empty else ""
+            staff_ca1_list = [name.strip() for name in staff_ca1_str.split(',') if name.strip()]
+            staff_ca2_str = df_schedule[(df_schedule['Ngày'].dt.date == current_date) & (df_schedule['Ca'] == 'Ca 2')]['Nhân viên được phân công'].iloc[0] if not df_schedule[(df_schedule['Ngày'].dt.date == current_date) & (df_schedule['Ca'] == 'Ca 2')].empty else ""
+            staff_ca2_list = [name.strip() for name in staff_ca2_str.split(',') if name.strip()]
+            row_data = {
+                'Thứ': day_name, 'Ngày': date_str,
+                'Ca 1 (NV1)': staff_ca1_list[0] if len(staff_ca1_list) > 0 else '', 'Ca 1 (NV2)': staff_ca1_list[1] if len(staff_ca1_list) > 1 else '', 'Ca 1 (NV3)': staff_ca1_list[2] if len(staff_ca1_list) > 2 else '',
+                'Ca 2 (NV1)': staff_ca2_list[0] if len(staff_ca2_list) > 0 else '', 'Ca 2 (NV2)': staff_ca2_list[1] if len(staff_ca2_list) > 1 else '', 'Ca 2 (NV3)': staff_ca2_list[2] if len(staff_ca2_list) > 2 else '',
+            }
+            output_rows.append(row_data)
+        df_display = pd.DataFrame(output_rows)
+        column_order = ['Thứ', 'Ngày', 'Ca 1 (NV1)', 'Ca 1 (NV2)', 'Ca 1 (NV3)', 'Ca 2 (NV1)', 'Ca 2 (NV2)', 'Ca 2 (NV3)']
+        df_display = df_display[column_order]
+        return df_display
+    except Exception as e:
+        st.error(f"Lỗi khi tạo bảng 8 cột (helper): {e}")
+        return None
+
+
 # --- REMOVED: find_replacements_ui function ---
 
 # --- Main Application Logic (UPDATED State Management and Display Logic) ---
