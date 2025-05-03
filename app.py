@@ -5,7 +5,7 @@ import io # Required for reading string data as file
 import google.generativeai as genai
 import yaml
 from datetime import datetime, timedelta
-# from config import GOOGLE_API_KEY # <<< ĐÃ XÓA HOẶC COMMENT DÒNG NÀY
+# from config import GOOGLE_API_KEY # <<< REMOVED IMPORT
 import re
 import json
 import sys # Required for checking xlsxwriter
@@ -64,49 +64,82 @@ def load_css():
     # CSS content kept the same as previous version
     st.markdown("""
         <style>
+            /* General Body and Font */
             body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-            .main .block-container { padding-top: 2rem; padding-bottom: 5rem; padding-left: 2rem; padding-right: 2rem; }
+            /* Main Container */
+            .main .block-container { padding-top: 2rem; padding-bottom: 5rem; padding-left: 2rem; padding-right: 2rem; } /* Reduced padding */
+            /* Titles */
             h1, h2 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 5px; margin-bottom: 20px;}
             h3 { color: #34495e; margin-top: 25px; margin-bottom: 15px; }
             body:has([data-theme="dark"]) h1, body:has([data-theme="dark"]) h2, body:has([data-theme="dark"]) h3 { color: #ecf0f1; border-bottom-color: #5dade2;}
             body:has([data-theme="dark"]) h3 { color: #bdc3c7;}
-            .stButton>button { border-radius: 8px; padding: 10px 15px; font-weight: 600; border: none; color: white; background-color: #3498db; transition: background-color 0.3s ease; margin-top: 5px; margin-bottom: 5px;}
+
+            /* Buttons */
+            .stButton>button { border-radius: 8px; padding: 10px 15px; font-weight: 600; border: none; color: white; background-color: #3498db; transition: background-color 0.3s ease; margin-top: 5px; margin-bottom: 5px;} /* Slightly less padding */
             .stButton>button:hover { background-color: #2980b9; }
             .stButton>button:active { background-color: #2471a3; }
             .stButton[key*="generate_ai_button"]>button { background-color: #2ecc71; }
             .stButton[key*="generate_ai_button"]>button:hover { background-color: #27ae60; }
-            .stButton[key*="generate_copy_text_button"]>button { background-color: #9b59b6; }
-            .stButton[key*="generate_copy_text_button"]>button:hover { background-color: #8e44ad; }
-            .stTextArea textarea { border-radius: 8px; border: 1px solid #bdc3c7; padding: 10px; min-height: 150px; font-family: monospace; }
+            /* Button for copy text */
+             .stButton[key*="generate_copy_text_button"]>button { background-color: #9b59b6; /* Purple */ }
+             .stButton[key*="generate_copy_text_button"]>button:hover { background-color: #8e44ad; /* Darker Purple */ }
+
+
+            /* Text Area */
+            .stTextArea textarea { border-radius: 8px; border: 1px solid #bdc3c7; padding: 10px; min-height: 150px; font-family: monospace; /* Use monospace for better alignment */}
             body:has([data-theme="dark"]) .stTextArea textarea { border: 1px solid #566573; }
             .stTextArea label { font-weight: 600; color: #34495e; margin-bottom: 5px; display: block;}
             body:has([data-theme="dark"]) .stTextArea label { color: #bdc3c7; }
-            .stDataFrame, .stDataEditor, .manual-table-header, .manual-table-row { border-radius: 8px; overflow: visible; margin-bottom: 10px;}
-            .manual-table-header > div { font-weight: bold; background-color: #eaf2f8; padding: 8px 6px; text-align: center; border: 1px solid #d6eaf8; font-size: 0.9rem;}
+
+            /* DataFrames / Data Editor / Manual Table */
+            .stDataFrame, .stDataEditor, .manual-table-header, .manual-table-row { border-radius: 8px; overflow: visible; margin-bottom: 10px;} /* Reduced margin */
+            .manual-table-header > div { font-weight: bold; background-color: #eaf2f8; padding: 8px 6px; text-align: center; border: 1px solid #d6eaf8; font-size: 0.9rem;} /* Smaller padding/font */
             body:has([data-theme="dark"]) .manual-table-header > div { background-color: #34495e; border: 1px solid #4e6070; }
-            .manual-table-row > div { padding: 4px 6px; border: 1px solid #e8ecf1; min-height: 55px; display: flex; align-items: center; justify-content: center;}
+            .manual-table-row > div { padding: 4px 6px; border: 1px solid #e8ecf1; min-height: 55px; display: flex; align-items: center; justify-content: center;} /* Reduced padding */
             body:has([data-theme="dark"]) .manual-table-row > div { border: 1px solid #4a4f5a; }
+            /* Alternating row colors for manual table */
             .manual-table-row:nth-child(even) > div { background-color: #f8f9fa; }
             body:has([data-theme="dark"]) .manual-table-row:nth-child(even) > div { background-color: #2c3e50; }
+
+
+            /* Selectbox in manual table */
             .manual-table-row .stSelectbox { width: 100%; overflow: visible !important; }
             .manual-table-row .stSelectbox div[data-baseweb="select"] { font-size: 0.85rem; width: 100%; background-color: var(--background-color); }
             .manual-table-row .stSelectbox div[data-baseweb="select"] > div:first-child { color: var(--text-color) !important; overflow: visible !important; }
             .manual-table-row .stSelectbox div[data-baseweb="select"] > div:first-child > div { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; max-width: none !important; }
-            .stSidebar .stNumberInput input, .stSidebar .stSlider, .stSidebar .stCheckbox { margin-bottom: 10px; }
-            .stSidebar h3 { color: #3498db; margin-top: 15px;}
-            body:has([data-theme="dark"]) .stSidebar h3 { color: #5dade2; }
-            .stSidebar .stMarkdown p { font-size: 0.95rem; line-height: 1.4;}
-            .stSidebar .stDivider { margin-top: 15px; margin-bottom: 15px;}
-            .footer { position: fixed; right: 15px; bottom: 10px; background-color: rgba(44, 62, 80, 0.9); color: #ecf0f1; padding: 8px 15px; border-radius: 8px; font-size: 13px; box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.2); z-index: 9999; }
-            body:has([data-theme="dark"]) .footer { background-color: rgba(52, 73, 94, 0.9); color: #bdc3c7; }
+
+
+            /* Sidebar */
+             .stSidebar .stNumberInput input, .stSidebar .stSlider, .stSidebar .stCheckbox { margin-bottom: 10px; }
+             .stSidebar h3 { color: #3498db; margin-top: 15px;}
+             body:has([data-theme="dark"]) .stSidebar h3 { color: #5dade2; }
+             .stSidebar .stMarkdown p { font-size: 0.95rem; line-height: 1.4;}
+             .stSidebar .stDivider { margin-top: 15px; margin-bottom: 15px;}
+
+            /* Footer */
+            .footer-copyright { /* Use this class for the new footer */
+                position: fixed; right: 15px; bottom: 10px;
+                color: #7f8c8d; /* Lighter gray color */
+                font-size: 12px; /* Smaller font */
+                text-align: right;
+                z-index: 9999;
+            }
+             body:has([data-theme="dark"]) .footer-copyright {
+                  color: #95a5a6; /* Adjust color for dark theme */
+             }
+
+            /* Login Box Specific Styles */
             .login-box { margin: 50px auto 0 auto; max-width: 380px; background-color: rgba(255, 255, 255, 0.9); backdrop-filter: blur(5px); padding: 35px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.15); text-align: center; }
             .login-title { font-size: 24px; font-weight: 600; color: #31333F; margin-bottom: 25px; border-bottom: none; }
             .login-box .stTextInput>div>div>input { padding: 12px; border: 1px solid #ccc; border-radius: 5px; width: 100%; margin-bottom: 15px;}
             .login-box .stButton>button { width: 100%; height: 48px; background-color: #31333F; color: #FFFFFF; border: none; border-radius: 5px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 15px; }
             .login-box .stButton>button:hover { background-color: #50525C; }
             .login-page-background { background: linear-gradient(to right, #74ebd5, #ACB6E5); min-height: 100vh; width: 100%; display: flex; align-items: center; justify-content: center; position: absolute; top: 0; left: 0; z-index: -1; }
+
+            /* Container styling */
             div[data-testid="stVerticalBlock"]:has(> div > div > div.stContainer) { }
              body:has([data-theme="dark"]) div[data-testid="stVerticalBlock"]:has(> div > div > div.stContainer) { }
+
         </style>
     """, unsafe_allow_html=True)
 
@@ -233,7 +266,7 @@ def preprocess_pasted_data_for_lookup(df_input):
     st.success("✅ Đã xử lý xong dữ liệu đăng ký gốc."); return lookup_df
 
 
-# --- AI Schedule Generation Function (UPDATED PROMPT for refined note handling) ---
+# --- AI Schedule Generation Function (Keep dynamic staffing logic and 4 shifts/week rule) ---
 def generate_schedule_with_ai(df_input, requirements, model):
     """Constructs a prompt and calls the AI model to generate the schedule."""
     # This function remains the same as the previous version (v10)
@@ -605,13 +638,14 @@ def main_app():
             col_dl2.warning("Không có dữ liệu lịch đã sửa để tải.")
 
 
-    st.markdown('<div class="footer">Built by <strong>Le Quy Phat</strong> © 2025 (AI Schedule + In-Table Dropdown v17 - Final)</div>', unsafe_allow_html=True) # Footer
+    # --- UPDATED: Use user-provided copyright ---
+    st.markdown("<p class='footer-copyright'>Copyright ©LeQuyPhat</p>", unsafe_allow_html=True)
 
 # --- Entry Point ---
 def main():
     """Main function to handle login state."""
     if 'logged_in' not in st.session_state: st.session_state.logged_in = False
-    load_css()
+    load_css() # Load CSS needs to happen outside login check if login UI uses it
     if not st.session_state.logged_in: login()
     else: main_app()
 
