@@ -5,8 +5,7 @@ import io # Required for reading string data as file
 import google.generativeai as genai
 import yaml
 from datetime import datetime, timedelta
-# OR-Tools import removed
-from config import GOOGLE_API_KEY
+# from config import GOOGLE_API_KEY # <<< ĐÃ XÓA HOẶC COMMENT DÒNG NÀY
 import re
 import json
 import sys # Required for checking xlsxwriter
@@ -22,12 +21,13 @@ try:
 except ImportError:
     st.warning("Module 'xlsxwriter' is recommended for Excel export. Install using: pip install xlsxwriter")
 
-# Check and configure Google API Key
+# --- UPDATED: Check and configure Google API Key using Streamlit Secrets ---
 GOOGLE_API_KEY = st.secrets.get("GOOGLE_API_KEY")
+
 if not GOOGLE_API_KEY:
     st.error("Lỗi: Google API Key chưa được cấu hình trong Streamlit Secrets!")
     st.info("Vui lòng thêm GOOGLE_API_KEY vào mục Secrets trong cài đặt ứng dụng của bạn trên Streamlit Community Cloud.")
-    st.stop()
+    st.stop() # Stop execution if no API key
 
 # Configure Google Generative AI
 try:
@@ -61,6 +61,7 @@ PREDEFINED_COLUMNS = [
 # --- Custom CSS for Styling (Keep as is) ---
 def load_css():
     """Loads custom CSS styles."""
+    # CSS content kept the same as previous version
     st.markdown("""
         <style>
             body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
@@ -235,6 +236,7 @@ def preprocess_pasted_data_for_lookup(df_input):
 # --- AI Schedule Generation Function (UPDATED PROMPT for refined note handling) ---
 def generate_schedule_with_ai(df_input, requirements, model):
     """Constructs a prompt and calls the AI model to generate the schedule."""
+    # This function remains the same as the previous version (v10)
     st.info(" Chuẩn bị dữ liệu và tạo prompt cho AI...")
     data_prompt_list = []; data_prompt_list.append("Dữ liệu đăng ký của nhân viên:")
     employee_col = next((col for col in df_input.columns if 'tên' in col.lower()), None)
@@ -505,18 +507,15 @@ def main_app():
                 data_io.seek(0) # Reset pointer to read the whole data again
                 header_keywords = ["tên", "thứ", "ghi chú", "tuần", "ngày"] # Keywords to detect header
                 if any(keyword in first_line for keyword in header_keywords):
-                    # Looks like a header, read normally
                     temp_df = pd.read_csv(data_io, sep='\t', header=0, skipinitialspace=True)
                     st.info("Đã đọc dữ liệu với tiêu đề từ người dùng.")
                 else:
-                    # Does not look like a header, use predefined names
                     temp_df = pd.read_csv(data_io, sep='\t', header=None, names=PREDEFINED_COLUMNS, skipinitialspace=True)
                     st.info("Không phát hiện tiêu đề, đã sử dụng tên cột mặc định.")
 
                 temp_df.dropna(axis=0, how='all', inplace=True); temp_df.dropna(axis=1, how='all', inplace=True)
                 if not temp_df.empty:
                     st.session_state.df_from_paste = temp_df; st.success("✅ Đã xử lý dữ liệu dán thành công.")
-                    # --- Preprocess for lookup right after successful paste processing ---
                     st.session_state.availability_lookup_df = preprocess_pasted_data_for_lookup(st.session_state.df_from_paste)
                 else: st.warning("⚠️ Dữ liệu sau khi xử lý bị rỗng.")
             except pd.errors.EmptyDataError: st.warning("⚠️ Dữ liệu dán vào trống.")
@@ -538,17 +537,17 @@ def main_app():
                               parsed_df = parse_ai_schedule(ai_response)
                               if parsed_df is not None:
                                    st.session_state.schedule_df = parsed_df # Store the 3-column parsed data
-                                   # The editable table will be displayed below using this data
+                                   # --- Generate the initial 8-column display DF ---
+                                   st.session_state.edited_schedule_table = create_8_column_df(st.session_state.schedule_df) # Use helper to create
                           else: st.error("❌ Không nhận được phản hồi từ AI.")
              else: st.info("Dữ liệu đã xử lý trống, không thể tạo lịch.")
 
     # --- Display Result Section (using manual table with dropdowns) ---
-    if st.session_state.schedule_df is not None:
+    if st.session_state.edited_schedule_table is not None: # Check if the 8-column DF exists
         with st.container(border=True):
              # Display the editable table and store the resulting DataFrame
-             # This function now handles the display and returns the current state based on selections
              st.session_state.edited_schedule_table = display_editable_schedule_with_dropdowns(
-                 st.session_state.schedule_df,
+                 st.session_state.schedule_df, # Pass the original parsed schedule for initial values
                  st.session_state.availability_lookup_df # Pass availability data
              )
 
@@ -606,7 +605,7 @@ def main_app():
             col_dl2.warning("Không có dữ liệu lịch đã sửa để tải.")
 
 
-    st.markdown('<div class="footer">Built by <strong>Le Quy Phat</strong> © 2025 (AI Schedule + Flexible Header + Refined Notes v16)</div>', unsafe_allow_html=True) # Footer
+    st.markdown('<div class="footer">Built by <strong>Le Quy Phat</strong> © 2025 (AI Schedule + In-Table Dropdown v17 - Final)</div>', unsafe_allow_html=True) # Footer
 
 # --- Entry Point ---
 def main():
