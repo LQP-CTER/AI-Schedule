@@ -116,13 +116,14 @@ def load_css():
              .stSidebar .stMarkdown p { font-size: 0.95rem; line-height: 1.4;}
              .stSidebar .stDivider { margin-top: 15px; margin-bottom: 15px;}
 
-            /* Footer */
-            .footer-copyright { /* Use this class for the new footer */
-                position: fixed; right: 15px; bottom: 10px;
+            /* --- UPDATED: Footer style for sidebar --- */
+            .footer-copyright {
+                /* position: fixed; right: 15px; bottom: 10px; /* REMOVED fixed positioning */
                 color: #7f8c8d; /* Lighter gray color */
                 font-size: 12px; /* Smaller font */
-                text-align: right;
-                z-index: 9999;
+                text-align: center; /* Center align in sidebar */
+                padding-top: 20px; /* Add some space above */
+                /* z-index: 9999; /* Not needed without fixed */
             }
              body:has([data-theme="dark"]) .footer-copyright {
                   color: #95a5a6; /* Adjust color for dark theme */
@@ -638,8 +639,9 @@ def main_app():
             col_dl2.warning("Không có dữ liệu lịch đã sửa để tải.")
 
 
-    # --- UPDATED: Use user-provided copyright ---
-    st.markdown("<p class='footer-copyright'>Copyright ©LeQuyPhat</p>", unsafe_allow_html=True)
+    # --- UPDATED: Use user-provided copyright in Sidebar ---
+    st.sidebar.divider() # Add a divider before copyright
+    st.sidebar.markdown("<p class='footer-copyright'>Copyright ©LeQuyPhat</p>", unsafe_allow_html=True)
 
 # --- Entry Point ---
 def main():
