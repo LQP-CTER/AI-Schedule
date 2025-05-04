@@ -118,16 +118,9 @@ def load_css():
 
             /* --- UPDATED: Footer style for sidebar --- */
             .footer-copyright {
-                /* position: fixed; right: 15px; bottom: 10px; /* REMOVED fixed positioning */
-                color: #7f8c8d; /* Lighter gray color */
-                font-size: 12px; /* Smaller font */
-                text-align: center; /* Center align in sidebar */
-                padding-top: 20px; /* Add some space above */
-                /* z-index: 9999; /* Not needed without fixed */
+                color: #7f8c8d; font-size: 12px; text-align: center; padding-top: 20px;
             }
-             body:has([data-theme="dark"]) .footer-copyright {
-                  color: #95a5a6; /* Adjust color for dark theme */
-             }
+             body:has([data-theme="dark"]) .footer-copyright { color: #95a5a6; }
 
             /* Login Box Specific Styles */
             .login-box { margin: 50px auto 0 auto; max-width: 380px; background-color: rgba(255, 255, 255, 0.9); backdrop-filter: blur(5px); padding: 35px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.15); text-align: center; }
@@ -204,7 +197,7 @@ def get_scheduling_requirements():
     return requirements
 
 
-# --- Helper Function to Find Start Date (Keep updated date parsing) ---
+# --- Helper Function to Find Start Date (UPDATED Date Parsing) ---
 def find_start_date(df_input):
     """Finds the start date (Monday) from the input DataFrame."""
     week_start_col = next((col for col in df_input.columns if 'tuần' in col.lower() or 'week' in col.lower()), None)
@@ -212,9 +205,13 @@ def find_start_date(df_input):
     if week_start_col and not df_input[week_start_col].empty:
         date_val_str = str(df_input[week_start_col].dropna().iloc[0]) # Get value as string
         try:
+            # --- UPDATED: Prioritize dayfirst=True for DD/MM/YYYY ---
             start_date = pd.to_datetime(date_val_str, dayfirst=True, errors='coerce') # Try DD/MM/YYYY first
-            if pd.isna(start_date): start_date = pd.to_datetime(date_val_str, errors='coerce')
-            if pd.notna(start_date): start_date = start_date - timedelta(days=start_date.weekday())
+            if pd.isna(start_date): # If dayfirst fails, try inferring default (might catch MM/DD/YYYY)
+                 start_date = pd.to_datetime(date_val_str, errors='coerce')
+
+            if pd.notna(start_date):
+                 start_date = start_date - timedelta(days=start_date.weekday()) # Adjust to Monday
         except Exception as e:
              st.warning(f"Lỗi phân tích ngày tháng từ cột '{week_start_col}': {e}. Giá trị: '{date_val_str}'"); pass
     return start_date
