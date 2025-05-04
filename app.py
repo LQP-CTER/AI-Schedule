@@ -40,7 +40,7 @@ generation_config = { "temperature": 0.7, "top_p": 1, "top_k": 1, "max_output_to
 
 # Initialize the Generative Model
 try:
-    model = genai.GenerativeModel(model_name="gemini-1.5-pro", generation_config=generation_config)
+    model = genai.GenerativeModel(model_name="gemini-2.0-flash", generation_config=generation_config)
 except Exception as e:
     st.error(f"Lỗi khởi tạo mô hình AI: {e}"); st.error("Kiểm tra API Key và kết nối mạng."); st.stop()
 
