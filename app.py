@@ -197,7 +197,7 @@ def get_scheduling_requirements():
     return requirements
 
 
-# --- Helper Function to Find Start Date (UPDATED Date Parsing) ---
+# --- Helper Function to Find Start Date (Keep updated date parsing) ---
 def find_start_date(df_input):
     """Finds the start date (Monday) from the input DataFrame."""
     week_start_col = next((col for col in df_input.columns if 'tuần' in col.lower() or 'week' in col.lower()), None)
@@ -205,13 +205,9 @@ def find_start_date(df_input):
     if week_start_col and not df_input[week_start_col].empty:
         date_val_str = str(df_input[week_start_col].dropna().iloc[0]) # Get value as string
         try:
-            # --- UPDATED: Prioritize dayfirst=True for DD/MM/YYYY ---
             start_date = pd.to_datetime(date_val_str, dayfirst=True, errors='coerce') # Try DD/MM/YYYY first
-            if pd.isna(start_date): # If dayfirst fails, try inferring default (might catch MM/DD/YYYY)
-                 start_date = pd.to_datetime(date_val_str, errors='coerce')
-
-            if pd.notna(start_date):
-                 start_date = start_date - timedelta(days=start_date.weekday()) # Adjust to Monday
+            if pd.isna(start_date): start_date = pd.to_datetime(date_val_str, errors='coerce')
+            if pd.notna(start_date): start_date = start_date - timedelta(days=start_date.weekday())
         except Exception as e:
              st.warning(f"Lỗi phân tích ngày tháng từ cột '{week_start_col}': {e}. Giá trị: '{date_val_str}'"); pass
     return start_date
@@ -264,10 +260,9 @@ def preprocess_pasted_data_for_lookup(df_input):
     st.success("✅ Đã xử lý xong dữ liệu đăng ký gốc."); return lookup_df
 
 
-# --- AI Schedule Generation Function (Keep dynamic staffing logic and 4 shifts/week rule) ---
+# --- AI Schedule Generation Function (UPDATED PROMPT with reinforced Double Day rule) ---
 def generate_schedule_with_ai(df_input, requirements, model):
     """Constructs a prompt and calls the AI model to generate the schedule."""
-    # This function remains the same as the previous version (v10)
     st.info(" Chuẩn bị dữ liệu và tạo prompt cho AI...")
     data_prompt_list = []; data_prompt_list.append("Dữ liệu đăng ký của nhân viên:")
     employee_col = next((col for col in df_input.columns if 'tên' in col.lower()), None)
@@ -311,8 +306,9 @@ def generate_schedule_with_ai(df_input, requirements, model):
     req_prompt_list.append(f"- **QUAN TRỌNG (Công bằng):** Mỗi nhân viên phải được xếp lịch làm việc **ĐÚNG {requirements['shifts_per_week_target']} ca** trong cả tuần.")
     req_prompt_list.append(f"- Ít nhất {requirements['min_rest_hours']} giờ nghỉ giữa các ca (nếu có thể >1 ca/ngày).")
     req_prompt_list.append(f"- Tối đa {requirements['max_consecutive_days']} ngày làm việc liên tiếp.")
-    req_prompt_list.append(daily_staffing_prompt) # Add dynamic daily staffing
-    # --- UPDATED: Refined note handling instructions ---
+    # --- UPDATED: Reinforce daily staffing rule ---
+    req_prompt_list.append(daily_staffing_prompt[:-1]) # Remove last newline
+    req_prompt_list.append("  + **LƯU Ý:** Ngày trùng tháng (ví dụ 3/3, 5/5) cần 3 người/ca, các ngày khác cần 2 người/ca.")
     req_prompt_list.append(f"- Xử lý 'Ghi chú' của nhân viên:")
     req_prompt_list.append(f"  + **Ưu tiên 1 (Bắt buộc):** Ghi chú 'nghỉ', 'bận', 'không thể', 'xin off' -> TUYỆT ĐỐI KHÔNG xếp lịch.")
     req_prompt_list.append(f"  + **Ưu tiên 2 (Mong muốn):** Ghi chú 'muốn làm', 'ưu tiên', 'có thể làm' -> CỐ GẮNG xếp nếu không vi phạm ràng buộc khác (mức độ ưu tiên gợi ý: {requirements['preferences_weight_hint']}).")
@@ -345,7 +341,7 @@ Ví dụ định dạng bảng MARKDOWN mong muốn (với ngày bắt đầu l�
 | 2025-05-06 | Ca 1  | NV E, NV F               | <--- 2 người vì là ngày thường
 | ... (cho đến 2025-05-11) ... | ...   | ...                      |
 
-**QUAN TRỌNG:** Chỉ trả về BẢNG MARKDOWN lịch làm việc, không thêm bất kỳ lời giải thích hay bình luận nào khác trước hoặc sau bảng. Đảm bảo cột "Ngày" chứa ngày<y_bin_46>-MM-DD chính xác cho cả tuần. **Đảm bảo xử lý các 'Ghi chú' theo hướng dẫn đã nêu, đặc biệt là logic ưu tiên cho giờ làm không trọn vẹn.** Đảm bảo mọi ràng buộc khác được đáp ứng (đặc biệt là **số người/ca theo từng ngày**, **ĐÚNG {requirements['shifts_per_week_target']} ca/người/tuần**, và {requirements['max_shifts_per_day']} ca/người/ngày). Nếu không thể tạo lịch đáp ứng tất cả ràng buộc (ví dụ: thiếu người cho một ca nào đó, hoặc không thể đảm bảo 4 ca/tuần cho mọi người), hãy ghi rõ điều đó trong bảng hoặc nêu lý do ngắn gọn ngay dưới bảng.
+**QUAN TRỌNG:** Chỉ trả về BẢNG MARKDOWN lịch làm việc, không thêm bất kỳ lời giải thích hay bình luận nào khác trước hoặc sau bảng. Đảm bảo cột "Ngày" chứa ngày<y_bin_46>-MM-DD chính xác cho cả tuần. **Đảm bảo xử lý các 'Ghi chú' theo hướng dẫn đã nêu, đặc biệt là logic ưu tiên cho giờ làm không trọn vẹn.** Đảm bảo mọi ràng buộc khác được đáp ứng (đặc biệt là **số người/ca theo từng ngày** như đã nêu ở trên, **ĐÚNG {requirements['shifts_per_week_target']} ca/người/tuần**, và {requirements['max_shifts_per_day']} ca/người/ngày). Nếu không thể tạo lịch đáp ứng tất cả ràng buộc (ví dụ: thiếu người cho một ca nào đó, hoặc không thể đảm bảo 4 ca/tuần cho mọi người), hãy ghi rõ điều đó trong bảng hoặc nêu lý do ngắn gọn ngay dưới bảng.
 """
     with st.expander("Xem Prompt gửi đến AI (để tham khảo)"): st.text(full_prompt)
     try: # Call AI Model
