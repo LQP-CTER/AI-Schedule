@@ -42,7 +42,7 @@ generation_config = {"temperature": 0.7, "top_p": 1, "top_k": 1, "max_output_tok
 
 # Initialize the Generative Model
 try:
-    model = genai.GenerativeModel(model_name="gemini-1.5-flash",
+    model = genai.GenerativeModel(model_name="gemini-2.5-flash",
                                   generation_config=generation_config)  # Sử dụng gemini-1.5-flash
 except Exception as e:
     st.error(f"Lỗi khởi tạo mô hình AI: {e}");
