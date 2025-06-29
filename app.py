@@ -207,7 +207,8 @@ def get_scheduling_requirements():
         f"- **Ca 1:** {requirements['shifts_definition']['Ca 1']['start']} - {requirements['shifts_definition']['Ca 1']['end']}")
     st.sidebar.markdown(
         f"- **Ca 2:** {requirements['shifts_definition']['Ca 2']['start']} - {requirements['shifts_definition']['Ca 2']['end']}")
-    st.sidebar.markdown(f"- **Số người/ca:** **2** (ngày thường), **3** (ngày event VD: 3/3, 5/5...)")
+    # --- CHANGE 1: Updated the staffing rule text in the sidebar ---
+    st.sidebar.markdown(f"- **Số người/ca:** **1** (ngày thường), **2** (ngày event VD: 3/3, 5/5...)")
     st.sidebar.markdown(f"- **Tối đa:** **{requirements['max_shifts_per_day']}** ca/người/ngày")
     st.sidebar.markdown(
         f"- **Tổng số ca/tuần (Mục tiêu):** **{requirements['shifts_per_week_target']}** ca/người")  # Hiển thị mục tiêu
@@ -384,11 +385,13 @@ def generate_schedule_with_ai(df_input, requirements, model):
     if start_date:
         for i in range(7):
             current_day = start_date + timedelta(days=i)
-            staff_count = 3 if current_day.day == current_day.month else 2
+            # --- CHANGE 2: Updated the staffing logic (2 for sale days, 1 for normal days) ---
+            staff_count = 2 if current_day.day == current_day.month else 1
             day_name_vn = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ Nhật"][i]
             daily_staffing_prompt += f"  + Ngày {current_day.strftime('%Y-%m-%d')} ({day_name_vn}): **{staff_count} người/ca** (Ca 1 và Ca 2).\n"
     else:
-        daily_staffing_prompt += "  + **2 người/ca** cho tất cả các ngày.\n"
+        # --- CHANGE 3: Updated the fallback staffing number ---
+        daily_staffing_prompt += "  + **1 người/ca** cho tất cả các ngày.\n"
 
     req_prompt_list = []  # Format requirements for prompt
     req_prompt_list.append("\nRàng buộc và Quy tắc xếp lịch:")
@@ -404,8 +407,9 @@ def generate_schedule_with_ai(df_input, requirements, model):
     req_prompt_list.append(f"- Ít nhất {requirements['min_rest_hours']} giờ nghỉ giữa các ca (nếu có thể >1 ca/ngày).")
     req_prompt_list.append(f"- Tối đa {requirements['max_consecutive_days']} ngày làm việc liên tiếp.")
     req_prompt_list.append(daily_staffing_prompt[:-1])  # Remove last newline
+    # --- CHANGE 4: Updated the summary note for staffing ---
     req_prompt_list.append(
-        "  + **LƯU Ý:** Ngày trùng tháng (ví dụ 3/3, 5/5) cần 3 người/ca, các ngày khác cần 2 người/ca.")
+        "  + **LƯU Ý:** Ngày trùng tháng (ví dụ 3/3, 5/5) cần 2 người/ca, các ngày khác cần 1 người/ca.")
     req_prompt_list.append(f"- Xử lý 'Ghi chú' của nhân viên (trong cột 'Ghi chú (nếu có)'):")
     req_prompt_list.append(
         f"  + **Ưu tiên 1 (Bắt buộc):** Nếu cột 'Ghi chú' chứa 'nghỉ cả tuần', 'xin nghỉ nguyên tuần', 'nghỉ', 'bận', 'không thể', 'xin off' -> TUYỆT ĐỐI KHÔNG xếp lịch cho nhân viên đó trong cả tuần (trừ khi ghi chú chỉ rõ phạm vi ngày cụ thể).")
@@ -436,13 +440,14 @@ Hãy trình bày lịch làm việc dưới dạng một bảng MARKDOWN rõ rà
 **Cột đầu tiên PHẢI là "Ngày" và chứa ngày tháng cụ thể (theo định dạng YYYY-MM-DD)** cho từng ngày trong tuần (Thứ 2 đến Chủ Nhật), tính toán dựa trên ngày bắt đầu tuần đã cho ({start_date_str_for_prompt}).
 Các cột tiếp theo là "Ca" và "Nhân viên được phân công". Sắp xếp theo ngày. **Trong cột "Nhân viên được phân công", liệt kê TẤT CẢ tên nhân viên được xếp vào ca đó, cách nhau bằng dấu phẩy.**
 
+**--- CHANGE 5: Updated the example Markdown table in the prompt ---**
 Ví dụ định dạng bảng MARKDOWN mong muốn (với ngày bắt đầu là 2025-05-05, là ngày Double Day):
 
 | Ngày       | Ca    | Nhân viên được phân công |
 |------------|-------|--------------------------|
-| 2025-05-05 | Ca 1  | NV A, NV B, NV X         | <--- 3 người vì là ngày 5/5
-| 2025-05-05 | Ca 2  | NV C, NV D, NV Y         | <--- 3 người vì là ngày 5/5
-| 2025-05-06 | Ca 1  | NV E, NV F               | <--- 2 người vì là ngày thường
+| 2025-05-05 | Ca 1  | NV A, NV B               | <--- 2 người vì là ngày 5/5
+| 2025-05-05 | Ca 2  | NV C, NV D               | <--- 2 người vì là ngày 5/5
+| 2025-05-06 | Ca 1  | NV E                     | <--- 1 người vì là ngày thường
 | ... (cho đến 2025-05-11) ... | ...   | ...                      |
 
 **QUAN TRỌNG:** Chỉ trả về BẢNG MARKDOWN lịch làm việc, không thêm bất kỳ lời giải thích hay bình luận nào khác trước hoặc sau bảng. Đảm bảo cột "Ngày" chứa ngày YYYY-MM-DD chính xác cho cả tuần. **Đảm bảo xử lý các 'Ghi chú' theo hướng dẫn đã nêu, đặc biệt là logic ưu tiên cho giờ làm không trọn vẹn.** Đảm bảo mọi ràng buộc khác được đáp ứng (đặc biệt là **số người/ca theo từng ngày** như đã nêu ở trên, **MỤC TIÊU {requirements['shifts_per_week_target']} ca/người/tuần PHẢI ĐƯỢC ƯU TIÊN TỐI ĐA**, và {requirements['max_shifts_per_day']} ca/người/ngày).
